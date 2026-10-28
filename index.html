@@ -29,8 +29,6 @@ h1{font-size:1.35rem;margin:.2rem 0 .3rem}
 #mic:active{transform:scale(.95)}
 #mic.on{background:var(--err);animation:pulse 1.2s ease-in-out infinite}
 @keyframes pulse{50%{box-shadow:0 0 0 1.1rem color-mix(in srgb,var(--err) 20%,transparent)}}
-#mic.on svg{display:none}
-#mic.on>span::before{content:"";display:block;width:1.5rem;height:1.5rem;background:currentColor;border-radius:.3rem;margin:0 auto .45rem}
 #mic svg{width:2.4rem;height:2.4rem;display:block;margin:0 auto .15rem}
 button:focus-visible{outline:3px solid var(--hit);outline-offset:3px}
 #status{min-height:1.6em;color:var(--sub);font-size:.95rem;text-align:center;margin:0}
@@ -57,7 +55,7 @@ ul{list-style:none;margin:0;padding:0;display:grid;gap:.5rem}
 <body>
 <main>
   <h1>英単語 聞き取り候補</h1>
-  <p class="lead">マイクを押して英単語を話し、もう一度押して止めると、聞き取った候補を一覧で表示します。</p>
+  <p class="lead">マイクを押して英単語を1つ話すと、聞き取った候補を一覧で表示します。</p>
 
   <div class="seg" role="group" aria-label="発音の種類">
     <button type="button" id="us" aria-pressed="true">アメリカ英語</button>
@@ -68,10 +66,10 @@ ul{list-style:none;margin:0;padding:0;display:grid;gap:.5rem}
     <button id="mic" type="button" aria-label="話す">
       <span>
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="3" width="6" height="12" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3"/></svg>
-        <span id="lbl">話す</span>
+        話す
       </span>
     </button>
-    <p id="status" role="status">「話す」を押して、英単語を話してください。</p>
+    <p id="status" role="status">マイクを押して、英単語を1つ話してください。</p>
   </div>
 
   <section aria-live="polite">
@@ -166,13 +164,7 @@ ul{list-style:none;margin:0;padding:0;display:grid;gap:.5rem}
     hist.hidden = false;
   }
 
-  function setUi(on){
-    listening = on;
-    mic.classList.toggle('on', on);
-    document.getElementById('lbl').textContent = on ? '停止' : '話す';
-    mic.setAttribute('aria-label', on ? '停止して結果を見る' : '話す');
-  }
-  function stopUi(){ setUi(false); }
+  function stopUi(){ listening = false; mic.classList.remove('on'); mic.setAttribute('aria-label', '話す'); }
 
   if (!SR) {
     mic.disabled = true;
@@ -180,99 +172,67 @@ ul{list-style:none;margin:0;padding:0;display:grid;gap:.5rem}
     return;
   }
 
-  var timer = null, lastRes = null, sess = 0, done = true, cur = null;
-
-  function deliver(res){
-    var items = [], seen = {};
-    if (res) {
-      for (var i = 0; i < res.length; i++) {
-        var t = res[i].transcript.trim();
-        var k = t.toLowerCase();
-        if (t && !seen[k]) { seen[k] = 1; items.push({ t: t, c: res[i].confidence || 0 }); }
-      }
-    }
-    if (!items.length) { say('聞き取れませんでした。もう一度「話す」を押して話してください。', true); return; }
-    show(items);
-    say(items.length > 1 ? items.length + '個の候補が見つかりました。' : '候補は1個でした。環境によっては複数表示されないことがあります。');
-  }
-
-  // 結果表示まで必ず進める（終了イベントが来なくても止まらない）
-  function finalize(id){
-    if (id !== sess || done) return;
-    done = true; clearTimeout(timer); cur = null; setUi(false);
-    deliver(lastRes);
-  }
-  function fail(id, msg){
-    if (id !== sess || done) return;
-    done = true; clearTimeout(timer); cur = null; setUi(false);
-    say(msg, true);
-  }
-
-  function stopAndDeliver(){
-    var id = sess, r = cur;
+  var timer = null;
+  function finish(abort){
     clearTimeout(timer);
-    setUi(false);
-    say('結果を確認しています…');
-    try { if (r) r.stop(); } catch(e){}
-    timer = setTimeout(function(){ finalize(id); }, 2500);
-  }
-
-  function begin(){
-    clearTimeout(timer);
-    var old = cur;
-    sess++; var id = sess;
-    done = false; lastRes = null; cur = null;
-    setUi(false);
-    if (old) { try { old.abort(); } catch(e){} }
-    try { speechSynthesis.cancel(); } catch(e){}
-    say('準備しています…');
-    setTimeout(function(){
-      if (id !== sess) return;
-      var r = new SR();
-      cur = r;
-      r.lang = lang;
-      r.maxAlternatives = 10;
-      r.interimResults = false;
-      r.continuous = true;
-      r.onstart = function(){
-        if (id !== sess || done) return;
-        clearTimeout(timer);
-        setUi(true);
-        say('聞いています… 話し終えたら「停止」を押してください。');
-        timer = setTimeout(function(){ if (id === sess && !done) stopAndDeliver(); }, 60000);
-      };
-      r.onresult = function(e){
-        if (id !== sess) return;
-        lastRes = e.results[e.results.length - 1];
-      };
-      r.onerror = function(e){
-        if (id !== sess) return;
-        if (e.error === 'aborted' || e.error === 'no-speech') {
-          if (lastRes) { finalize(id); return; }
-          if (e.error === 'aborted') { finalize(id); return; }
-          fail(id, '声が聞こえませんでした。もう一度話してください。（no-speech）'); return;
-        }
-        var m = {
-          'not-allowed': 'マイクが許可されていません。ブラウザの設定でマイクを許可してください。',
-          'service-not-allowed': '音声認識が許可されていません。端末の設定で Siri と音声入力を確認してください。',
-          'audio-capture': 'マイクが見つかりません。',
-          'network': 'ネットワークに接続してから、もう一度お試しください。'
-        };
-        fail(id, (m[e.error] || '音声認識でエラーが起きました。') + '（' + e.error + '）');
-      };
-      r.onend = function(){ finalize(id); };
-      try {
-        r.start();
-        timer = setTimeout(function(){
-          if (id === sess && !done && !listening) fail(id, 'マイクを開始できませんでした。もう一度「話す」を押してください。');
-        }, 5000);
-      } catch(err){ fail(id, '開始できませんでした。もう一度押してください。'); }
-    }, 200);
+    var r = rec; rec = null;
+    stopUi();
+    if (r) { try { abort ? r.abort() : r.stop(); } catch(e){} }
   }
 
   mic.onclick = function(){
-    if (listening && !done) { stopAndDeliver(); return; }
-    begin();
+    if (listening) { finish(true); say('中止しました。もう一度押すと再開できます。'); return; }
+    try { speechSynthesis.cancel(); } catch(e){}
+    var cur = new SR();
+    rec = cur;
+    var got = false;
+    cur.lang = lang;
+    cur.maxAlternatives = 10;
+    cur.interimResults = false;
+    cur.continuous = false;
+    cur.onstart = function(){
+      if (cur !== rec) return;
+      listening = true; mic.classList.add('on'); mic.setAttribute('aria-label', '停止'); say('聞いています…');
+    };
+    cur.onspeechend = function(){ if (cur === rec) { try { cur.stop(); } catch(e){} } };
+    cur.onresult = function(e){
+      if (cur !== rec) return;
+      got = true;
+      var r = e.results[0], seen = {}, items = [];
+      for (var i = 0; i < r.length; i++) {
+        var t = r[i].transcript.trim();
+        var k = t.toLowerCase();
+        if (t && !seen[k]) { seen[k] = 1; items.push({ t: t, c: r[i].confidence || 0 }); }
+      }
+      finish(false);
+      if (!items.length) { say('聞き取れませんでした。もう一度話してください。', true); return; }
+      show(items);
+      say(items.length > 1 ? items.length + '個の候補が見つかりました。' : '候補は1個でした。環境によっては複数表示されないことがあります。');
+    };
+    cur.onerror = function(e){
+      if (cur !== rec) return;
+      finish(true);
+      if (e.error === 'aborted') return;
+      var m = {
+        'not-allowed': 'マイクが許可されていません。ブラウザの設定でマイクを許可してください。',
+        'service-not-allowed': 'マイクが許可されていません。ブラウザの設定でマイクを許可してください。',
+        'no-speech': '声が聞こえませんでした。もう一度話してください。',
+        'audio-capture': 'マイクが見つかりません。',
+        'network': 'ネットワークに接続してから、もう一度お試しください。'
+      };
+      say(m[e.error] || '音声認識でエラーが起きました（' + e.error + '）。', true);
+    };
+    cur.onend = function(){
+      if (cur !== rec) return;
+      finish(false);
+      if (!got) say('聞き取れませんでした。もう一度話してください。', true);
+    };
+    try {
+      cur.start();
+      timer = setTimeout(function(){
+        if (cur === rec) { finish(true); say('時間切れです。もう一度押して話してください。', true); }
+      }, 10000);
+    } catch(err){ finish(true); say('開始できませんでした。もう一度押してください。', true); }
   };
 })();
 </script>
