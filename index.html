@@ -1,9 +1,9 @@
 <!DOCTYPE html>
-<!-- バージョン 1.7（毎回リセット） 作成日時 2026-10-28 16:31 JST -->
+<!-- バージョン 1.8（聞き取りごとに自動リセット） 作成日時 2026-10-28 16:38 JST -->
 <html lang="ja">
 <head>
 <meta charset="utf-8">
-<meta name="version" content="1.7 / 2026-10-28 16:31 JST">
+<meta name="version" content="1.8 / 2026-10-28 16:38 JST">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>英単語 聞き取り候補</title>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,600&family=Zen+Kaku+Gothic+New:wght@400;700&display=swap">
@@ -85,7 +85,7 @@ ul{list-style:none;margin:0;padding:0;display:grid;gap:.5rem}
     <h2>これまでの結果</h2>
     <ul id="histList"></ul>
   </section>
-  <p class="ver">バージョン 1.7（2026年10月28日 16:31 作成）</p>
+  <p class="ver">バージョン 1.8（2026年10月28日 16:38 作成）</p>
 </main>
 
 <script>
@@ -99,7 +99,7 @@ ul{list-style:none;margin:0;padding:0;display:grid;gap:.5rem}
   var histList = document.getElementById('histList');
   var lang = 'en-US';
   var listening = false;
-  var rec = null;
+  var cache = {}, curItems = null, histData = [];
 
   function say(msg, isErr){ statusEl.textContent = msg; statusEl.className = isErr ? 'err' : ''; }
 
@@ -120,7 +120,14 @@ ul{list-style:none;margin:0;padding:0;display:grid;gap:.5rem}
     } catch(e){}
   }
 
-  var cache = {};
+  // 1回の聞き取りごとにページを読み込み直し、毎回まっさらな状態にする
+  function saveAndReload(msg, isErr){
+    try {
+      sessionStorage.setItem('st', JSON.stringify({ lang: lang, cache: cache, items: curItems, hist: histData, msg: msg, err: !!isErr }));
+    } catch(e){}
+    location.reload();
+  }
+
   var JA = /[\u3040-\u30ff\u3400-\u9fff]/;
   function translate(text, el){
     var key = text.toLowerCase();
@@ -128,8 +135,8 @@ ul{list-style:none;margin:0;padding:0;display:grid;gap:.5rem}
       if (ja) { el.textContent = ja; el.className = 'ja'; }
       else { el.textContent = '訳を取得できませんでした'; el.className = 'ja mute'; }
     }
-    if (key in cache) { put(cache[key]); return; }
-    fetch('https://api.mymemory.translated.net/get?langpair=en|ja&q=' + encodeURIComponent(key))
+    if (key in cache) { put(cache[key]); return Promise.resolve(); }
+    return fetch('https://api.mymemory.translated.net/get?langpair=en|ja&q=' + encodeURIComponent(key))
       .then(function(r){ return r.json(); })
       .then(function(d){
         var ja = d && d.responseData && d.responseData.translatedText;
@@ -139,7 +146,8 @@ ul{list-style:none;margin:0;padding:0;display:grid;gap:.5rem}
       .catch(function(){ put(''); });
   }
 
-  function show(items){
+  function renderList(items){
+    var ps = [];
     list.innerHTML = '';
     items.forEach(function(it, i){
       var li = document.createElement('li');
@@ -148,7 +156,7 @@ ul{list-style:none;margin:0;padding:0;display:grid;gap:.5rem}
       b.className = 'cand' + (i === 0 ? ' top' : '');
       var pct = Math.round(it.c * 100);
       b.innerHTML = '<span class="w"></span><span class="p"></span><span class="ja mute">訳を調べています…</span><span class="bar"><i></i></span>';
-      translate(it.t, b.querySelector('.ja'));
+      ps.push(translate(it.t, b.querySelector('.ja')));
       b.querySelector('.w').textContent = it.t;
       if (i === 0) { var tag = document.createElement('span'); tag.className = 'tag'; tag.textContent = '最有力'; b.querySelector('.w').appendChild(tag); }
       b.querySelector('.p').textContent = pct + '%';
@@ -159,16 +167,43 @@ ul{list-style:none;margin:0;padding:0;display:grid;gap:.5rem}
       list.appendChild(li);
     });
     hint.hidden = false;
-    var h = document.createElement('li');
-    h.innerHTML = '<b></b><span></span>';
-    h.querySelector('b').textContent = items[0].t;
-    h.querySelector('span').textContent = items.slice(1).map(function(x){ return x.t; }).join('、');
-    histList.insertBefore(h, histList.firstChild);
-    while (histList.children.length > 8) histList.removeChild(histList.lastChild);
-    hist.hidden = false;
+    return ps;
   }
 
-  function stopUi(){ listening = false; mic.classList.remove('on'); mic.setAttribute('aria-label', '話す'); }
+  function renderHist(){
+    histList.innerHTML = '';
+    histData.forEach(function(h){
+      var li = document.createElement('li');
+      li.innerHTML = '<b></b><span></span>';
+      li.querySelector('b').textContent = h.t;
+      li.querySelector('span').textContent = h.rest;
+      histList.appendChild(li);
+    });
+    hist.hidden = !histData.length;
+  }
+
+  function show(items){
+    curItems = items;
+    histData.unshift({ t: items[0].t, rest: items.slice(1).map(function(x){ return x.t; }).join('、') });
+    histData = histData.slice(0, 8);
+    renderHist();
+    return renderList(items);
+  }
+
+  // 読み込み直したあとに、前回の結果とメッセージを復元する
+  try {
+    var st = JSON.parse(sessionStorage.getItem('st') || 'null');
+    sessionStorage.removeItem('st');
+    if (st) {
+      if (st.lang === 'en-US' || st.lang === 'en-GB') setLang(st.lang);
+      cache = st.cache || {};
+      histData = st.hist || [];
+      curItems = st.items || null;
+      renderHist();
+      if (curItems) renderList(curItems);
+      if (st.msg) say(st.msg, st.err);
+    }
+  } catch(e){}
 
   if (!SR) {
     mic.disabled = true;
@@ -177,7 +212,6 @@ ul{list-style:none;margin:0;padding:0;display:grid;gap:.5rem}
   }
 
   var timer = null, overall = null, rec = null, sess = 0, done = true, tries = 0, lastRes = null;
-  var used = false, auto = false;
 
   function ui(on){
     listening = on;
@@ -194,9 +228,14 @@ ul{list-style:none;margin:0;padding:0;display:grid;gap:.5rem}
         if (t && !seen[k]) { seen[k] = 1; items.push({ t: t, c: res[i].confidence || 0 }); }
       }
     }
-    if (!items.length) { say('聞き取れませんでした。もう一度「話す」を押して話してください。', true); return; }
-    show(items);
-    say(items.length > 1 ? items.length + '個の候補が見つかりました。' : '候補は1個でした。環境によっては複数表示されないことがあります。');
+    if (!items.length) { saveAndReload('聞き取れませんでした。もう一度「話す」を押して話してください。', true); return; }
+    var msg = items.length > 1 ? items.length + '個の候補が見つかりました。' : '候補は1個でした。環境によっては複数表示されないことがあります。';
+    mic.disabled = true;
+    say('結果を整えています…');
+    var ps = show(items), went = false;
+    function go(){ if (went) return; went = true; saveAndReload(msg, false); }
+    Promise.all(ps).then(go);
+    setTimeout(go, 4000);
   }
 
   function release(){
@@ -215,15 +254,13 @@ ul{list-style:none;margin:0;padding:0;display:grid;gap:.5rem}
   function fail(id, msg){
     if (id !== sess || done) return;
     done = true; release(); ui(false);
-    if (auto) { auto = false; used = false; msg += ' 「話す」を押して、もう一度お試しください。'; }
-    say(msg, true);
+    saveAndReload(msg, true);
   }
 
-  // 録音が始まらなかった場合は、新しい接続でやり直す
   function retryOrFail(id, msg){
     if (id !== sess || done) return;
-    if (tries < 2) { tries++; say('接続し直しています…'); startRec(id); }
-    else fail(id, msg || '聞き取れませんでした。ページを再読み込みして、もう一度お試しください。');
+    if (tries < 1) { tries++; say('接続し直しています…'); startRec(id); }
+    else fail(id, msg || '聞き取れませんでした。もう一度「話す」を押してください。');
   }
 
   function startRec(id){
@@ -239,7 +276,7 @@ ul{list-style:none;margin:0;padding:0;display:grid;gap:.5rem}
       r.continuous = false;
       function opening(){
         if (id !== sess || done || opened) return;
-        opened = true; auto = false; clearTimeout(timer);
+        opened = true; clearTimeout(timer);
         ui(true); say('聞いています…');
         overall = setTimeout(function(){
           if (id !== sess || done) return;
@@ -277,41 +314,20 @@ ul{list-style:none;margin:0;padding:0;display:grid;gap:.5rem}
         r.start();
         timer = setTimeout(function(){ retryOrFail(id); }, 4000);
       } catch(err){ retryOrFail(id, '開始できませんでした。もう一度押してください。'); }
-    }, 300);
+    }, 200);
   }
 
   mic.onclick = function(){
     if (!done) {
       done = true; release(); ui(false);
-      say('中止しました。もう一度「話す」を押すと再開できます。');
+      saveAndReload('中止しました。もう一度「話す」を押すと再開できます。', false);
       return;
     }
-    // 2回目以降は、ページを読み込み直して、毎回まっさらな状態から始める
-    if (used) {
-      try { sessionStorage.setItem('autostart', '1'); sessionStorage.setItem('lang', lang); } catch(e){}
-      say('リセットしています…');
-      location.reload();
-      return;
-    }
-    used = true;
     try { speechSynthesis.cancel(); } catch(e){}
     sess++; done = false; tries = 0; lastRes = null;
     say('準備しています…');
     startRec(sess);
   };
-
-  // 読み込み直した直後は、自動で聞き取りを始める
-  try {
-    var sl = sessionStorage.getItem('lang');
-    if (sl === 'en-US' || sl === 'en-GB') setLang(sl);
-    auto = sessionStorage.getItem('autostart') === '1';
-    sessionStorage.removeItem('autostart');
-  } catch(e){}
-  if (auto) {
-    used = true; sess++; done = false; tries = 2; lastRes = null;
-    say('準備しています…');
-    startRec(sess);
-  }
 })();
 </script>
 </body>
