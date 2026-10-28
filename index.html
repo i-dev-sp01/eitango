@@ -172,37 +172,67 @@ ul{list-style:none;margin:0;padding:0;display:grid;gap:.5rem}
     return;
   }
 
+  var timer = null;
+  function finish(abort){
+    clearTimeout(timer);
+    var r = rec; rec = null;
+    stopUi();
+    if (r) { try { abort ? r.abort() : r.stop(); } catch(e){} }
+  }
+
   mic.onclick = function(){
-    if (listening) { try { rec.stop(); } catch(e){} return; }
-    rec = new SR();
-    rec.lang = lang;
-    rec.maxAlternatives = 10;
-    rec.interimResults = false;
-    rec.continuous = false;
-    rec.onstart = function(){ listening = true; mic.classList.add('on'); mic.setAttribute('aria-label', '停止'); say('聞いています…'); };
-    rec.onresult = function(e){
+    if (listening) { finish(true); say('中止しました。もう一度押すと再開できます。'); return; }
+    try { speechSynthesis.cancel(); } catch(e){}
+    var cur = new SR();
+    rec = cur;
+    var got = false;
+    cur.lang = lang;
+    cur.maxAlternatives = 10;
+    cur.interimResults = false;
+    cur.continuous = false;
+    cur.onstart = function(){
+      if (cur !== rec) return;
+      listening = true; mic.classList.add('on'); mic.setAttribute('aria-label', '停止'); say('聞いています…');
+    };
+    cur.onspeechend = function(){ if (cur === rec) { try { cur.stop(); } catch(e){} } };
+    cur.onresult = function(e){
+      if (cur !== rec) return;
+      got = true;
       var r = e.results[0], seen = {}, items = [];
       for (var i = 0; i < r.length; i++) {
         var t = r[i].transcript.trim();
         var k = t.toLowerCase();
         if (t && !seen[k]) { seen[k] = 1; items.push({ t: t, c: r[i].confidence || 0 }); }
       }
+      finish(false);
       if (!items.length) { say('聞き取れませんでした。もう一度話してください。', true); return; }
       show(items);
       say(items.length > 1 ? items.length + '個の候補が見つかりました。' : '候補は1個でした。環境によっては複数表示されないことがあります。');
     };
-    rec.onerror = function(e){
+    cur.onerror = function(e){
+      if (cur !== rec) return;
+      finish(true);
+      if (e.error === 'aborted') return;
       var m = {
-        'not-allowed': 'マイクが許可されていません。ブラウザの設定でマイクを許可するか、このページをSafariやChromeで直接開いてください。',
-        'service-not-allowed': 'マイクが許可されていません。ブラウザの設定でマイクを許可するか、このページをSafariやChromeで直接開いてください。',
+        'not-allowed': 'マイクが許可されていません。ブラウザの設定でマイクを許可してください。',
+        'service-not-allowed': 'マイクが許可されていません。ブラウザの設定でマイクを許可してください。',
         'no-speech': '声が聞こえませんでした。もう一度話してください。',
         'audio-capture': 'マイクが見つかりません。',
         'network': 'ネットワークに接続してから、もう一度お試しください。'
       };
       say(m[e.error] || '音声認識でエラーが起きました（' + e.error + '）。', true);
     };
-    rec.onend = stopUi;
-    try { rec.start(); } catch(err){ say('開始できませんでした。もう一度押してください。', true); stopUi(); }
+    cur.onend = function(){
+      if (cur !== rec) return;
+      finish(false);
+      if (!got) say('聞き取れませんでした。もう一度話してください。', true);
+    };
+    try {
+      cur.start();
+      timer = setTimeout(function(){
+        if (cur === rec) { finish(true); say('時間切れです。もう一度押して話してください。', true); }
+      }, 10000);
+    } catch(err){ finish(true); say('開始できませんでした。もう一度押してください。', true); }
   };
 })();
 </script>
