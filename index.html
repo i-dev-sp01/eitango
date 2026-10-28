@@ -180,7 +180,7 @@ ul{list-style:none;margin:0;padding:0;display:grid;gap:.5rem}
     return;
   }
 
-  var timer = null, lastRes = null;
+  var timer = null, lastRes = null, sess = 0, done = true, cur = null;
 
   function deliver(res){
     var items = [], seen = {};
@@ -191,62 +191,88 @@ ul{list-style:none;margin:0;padding:0;display:grid;gap:.5rem}
         if (t && !seen[k]) { seen[k] = 1; items.push({ t: t, c: res[i].confidence || 0 }); }
       }
     }
-    if (!items.length) { say('聞き取れませんでした。もう一度話してください。', true); return; }
+    if (!items.length) { say('聞き取れませんでした。もう一度「話す」を押して話してください。', true); return; }
     show(items);
     say(items.length > 1 ? items.length + '個の候補が見つかりました。' : '候補は1個でした。環境によっては複数表示されないことがあります。');
   }
 
-  function stopAndDeliver(r){
+  // 結果表示まで必ず進める（終了イベントが来なくても止まらない）
+  function finalize(id){
+    if (id !== sess || done) return;
+    done = true; clearTimeout(timer); cur = null; setUi(false);
+    deliver(lastRes);
+  }
+  function fail(id, msg){
+    if (id !== sess || done) return;
+    done = true; clearTimeout(timer); cur = null; setUi(false);
+    say(msg, true);
+  }
+
+  function stopAndDeliver(){
+    var id = sess, r = cur;
     clearTimeout(timer);
     setUi(false);
     say('結果を確認しています…');
-    try { r.stop(); } catch(e){}
-    timer = setTimeout(function(){ if (rec === r) { rec = null; deliver(lastRes); } }, 2500);
+    try { if (r) r.stop(); } catch(e){}
+    timer = setTimeout(function(){ finalize(id); }, 2500);
+  }
+
+  function begin(){
+    clearTimeout(timer);
+    var old = cur;
+    sess++; var id = sess;
+    done = false; lastRes = null; cur = null;
+    setUi(false);
+    if (old) { try { old.abort(); } catch(e){} }
+    try { speechSynthesis.cancel(); } catch(e){}
+    say('準備しています…');
+    setTimeout(function(){
+      if (id !== sess) return;
+      var r = new SR();
+      cur = r;
+      r.lang = lang;
+      r.maxAlternatives = 10;
+      r.interimResults = false;
+      r.continuous = true;
+      r.onstart = function(){
+        if (id !== sess || done) return;
+        clearTimeout(timer);
+        setUi(true);
+        say('聞いています… 話し終えたら「停止」を押してください。');
+        timer = setTimeout(function(){ if (id === sess && !done) stopAndDeliver(); }, 60000);
+      };
+      r.onresult = function(e){
+        if (id !== sess) return;
+        lastRes = e.results[e.results.length - 1];
+      };
+      r.onerror = function(e){
+        if (id !== sess) return;
+        if (e.error === 'aborted' || e.error === 'no-speech') {
+          if (lastRes) { finalize(id); return; }
+          if (e.error === 'aborted') { finalize(id); return; }
+          fail(id, '声が聞こえませんでした。もう一度話してください。（no-speech）'); return;
+        }
+        var m = {
+          'not-allowed': 'マイクが許可されていません。ブラウザの設定でマイクを許可してください。',
+          'service-not-allowed': '音声認識が許可されていません。端末の設定で Siri と音声入力を確認してください。',
+          'audio-capture': 'マイクが見つかりません。',
+          'network': 'ネットワークに接続してから、もう一度お試しください。'
+        };
+        fail(id, (m[e.error] || '音声認識でエラーが起きました。') + '（' + e.error + '）');
+      };
+      r.onend = function(){ finalize(id); };
+      try {
+        r.start();
+        timer = setTimeout(function(){
+          if (id === sess && !done && !listening) fail(id, 'マイクを開始できませんでした。もう一度「話す」を押してください。');
+        }, 5000);
+      } catch(err){ fail(id, '開始できませんでした。もう一度押してください。'); }
+    }, 200);
   }
 
   mic.onclick = function(){
-    if (listening && rec) { stopAndDeliver(rec); return; }
-    clearTimeout(timer);
-    if (rec) { try { rec.abort(); } catch(e){} rec = null; }
-    try { speechSynthesis.cancel(); } catch(e){}
-    var cur = new SR();
-    rec = cur;
-    lastRes = null;
-    cur.lang = lang;
-    cur.maxAlternatives = 10;
-    cur.interimResults = false;
-    cur.continuous = true;
-    cur.onstart = function(){
-      if (cur !== rec) return;
-      setUi(true); say('聞いています… 話し終えたら「停止」を押してください。');
-    };
-    cur.onresult = function(e){
-      if (cur !== rec) return;
-      lastRes = e.results[e.results.length - 1];
-    };
-    cur.onerror = function(e){
-      if (cur !== rec) return;
-      clearTimeout(timer); rec = null; setUi(false);
-      if (e.error === 'aborted') return;
-      if (e.error === 'no-speech' && lastRes) { deliver(lastRes); return; }
-      var m = {
-        'not-allowed': 'マイクが許可されていません。ブラウザの設定でマイクを許可してください。',
-        'service-not-allowed': '音声認識が許可されていません。端末の設定で Siri と音声入力を確認してください。',
-        'no-speech': '声が聞こえませんでした。もう一度話してください。',
-        'audio-capture': 'マイクが見つかりません。',
-        'network': 'ネットワークに接続してから、もう一度お試しください。'
-      };
-      say((m[e.error] || '音声認識でエラーが起きました。') + '（' + e.error + '）', true);
-    };
-    cur.onend = function(){
-      if (cur !== rec) return;
-      clearTimeout(timer); rec = null; setUi(false);
-      deliver(lastRes);
-    };
-    try {
-      cur.start();
-      timer = setTimeout(function(){ if (cur === rec) stopAndDeliver(cur); }, 60000);
-    } catch(err){ rec = null; setUi(false); say('開始できませんでした。もう一度押してください。', true); }
+    if (listening && !done) { stopAndDeliver(); return; }
+    begin();
   };
 })();
 </script>
