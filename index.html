@@ -172,67 +172,118 @@ ul{list-style:none;margin:0;padding:0;display:grid;gap:.5rem}
     return;
   }
 
-  var timer = null;
-  function finish(abort){
-    clearTimeout(timer);
+  var timer = null, overall = null, rec = null, sess = 0, done = true, tries = 0, lastRes = null;
+
+  function ui(on){
+    listening = on;
+    mic.classList.toggle('on', on);
+    mic.setAttribute('aria-label', on ? '中止' : '話す');
+  }
+
+  function deliver(res){
+    var items = [], seen = {};
+    if (res) {
+      for (var i = 0; i < res.length; i++) {
+        var t = res[i].transcript.trim();
+        var k = t.toLowerCase();
+        if (t && !seen[k]) { seen[k] = 1; items.push({ t: t, c: res[i].confidence || 0 }); }
+      }
+    }
+    if (!items.length) { say('聞き取れませんでした。もう一度「話す」を押して話してください。', true); return; }
+    show(items);
+    say(items.length > 1 ? items.length + '個の候補が見つかりました。' : '候補は1個でした。環境によっては複数表示されないことがあります。');
+  }
+
+  function release(){
+    clearTimeout(timer); clearTimeout(overall);
     var r = rec; rec = null;
-    stopUi();
-    if (r) { try { abort ? r.abort() : r.stop(); } catch(e){} }
+    if (r) {
+      r.onstart = r.onaudiostart = r.onresult = r.onerror = r.onend = r.onspeechend = null;
+      try { r.abort(); } catch(e){}
+    }
+  }
+  function finalize(id){
+    if (id !== sess || done) return;
+    done = true; release(); ui(false);
+    deliver(lastRes);
+  }
+  function fail(id, msg){
+    if (id !== sess || done) return;
+    done = true; release(); ui(false);
+    say(msg, true);
+  }
+
+  // 録音が始まらなかった場合は、新しい接続でやり直す
+  function retryOrFail(id, msg){
+    if (id !== sess || done) return;
+    if (tries < 2) { tries++; say('接続し直しています…'); startRec(id); }
+    else fail(id, msg || '聞き取れませんでした。ページを再読み込みして、もう一度お試しください。');
+  }
+
+  function startRec(id){
+    release(); ui(false);
+    setTimeout(function(){
+      if (id !== sess || done) return;
+      var r = new SR();
+      rec = r;
+      var opened = false;
+      r.lang = lang;
+      r.maxAlternatives = 10;
+      r.interimResults = false;
+      r.continuous = false;
+      function opening(){
+        if (id !== sess || done || opened) return;
+        opened = true; clearTimeout(timer);
+        ui(true); say('聞いています…');
+        overall = setTimeout(function(){
+          if (id !== sess || done) return;
+          try { r.stop(); } catch(e){}
+          setTimeout(function(){ if (lastRes) finalize(id); else fail(id, '時間切れです。もう一度「話す」を押して話してください。'); }, 1500);
+        }, 12000);
+      }
+      r.onstart = opening;
+      r.onaudiostart = opening;
+      r.onspeechend = function(){ if (id === sess && !done) { try { r.stop(); } catch(e){} } };
+      r.onresult = function(e){
+        if (id !== sess || done) return;
+        lastRes = e.results[e.results.length - 1];
+        finalize(id);
+      };
+      r.onerror = function(e){
+        if (id !== sess || done) return;
+        if (e.error === 'no-speech') { fail(id, '声が聞こえませんでした。もう一度話してください。（no-speech）'); return; }
+        if (e.error === 'aborted') { retryOrFail(id); return; }
+        var m = {
+          'not-allowed': 'マイクが許可されていません。ブラウザの設定でマイクを許可してください。',
+          'service-not-allowed': '音声認識が許可されていません。端末の設定で Siri と音声入力を確認してください。',
+          'audio-capture': 'マイクが見つかりません。',
+          'network': 'ネットワークに接続してから、もう一度お試しください。'
+        };
+        fail(id, (m[e.error] || '音声認識でエラーが起きました。') + '（' + e.error + '）');
+      };
+      r.onend = function(){
+        if (id !== sess || done) return;
+        if (lastRes) finalize(id);
+        else if (!opened) retryOrFail(id);
+        else fail(id, '聞き取れませんでした。もう一度「話す」を押して話してください。');
+      };
+      try {
+        r.start();
+        timer = setTimeout(function(){ retryOrFail(id); }, 4000);
+      } catch(err){ retryOrFail(id, '開始できませんでした。もう一度押してください。'); }
+    }, 300);
   }
 
   mic.onclick = function(){
-    if (listening) { finish(true); say('中止しました。もう一度押すと再開できます。'); return; }
+    if (!done) {
+      done = true; release(); ui(false);
+      say('中止しました。もう一度「話す」を押すと再開できます。');
+      return;
+    }
     try { speechSynthesis.cancel(); } catch(e){}
-    var cur = new SR();
-    rec = cur;
-    var got = false;
-    cur.lang = lang;
-    cur.maxAlternatives = 10;
-    cur.interimResults = false;
-    cur.continuous = false;
-    cur.onstart = function(){
-      if (cur !== rec) return;
-      listening = true; mic.classList.add('on'); mic.setAttribute('aria-label', '停止'); say('聞いています…');
-    };
-    cur.onspeechend = function(){ if (cur === rec) { try { cur.stop(); } catch(e){} } };
-    cur.onresult = function(e){
-      if (cur !== rec) return;
-      got = true;
-      var r = e.results[0], seen = {}, items = [];
-      for (var i = 0; i < r.length; i++) {
-        var t = r[i].transcript.trim();
-        var k = t.toLowerCase();
-        if (t && !seen[k]) { seen[k] = 1; items.push({ t: t, c: r[i].confidence || 0 }); }
-      }
-      finish(false);
-      if (!items.length) { say('聞き取れませんでした。もう一度話してください。', true); return; }
-      show(items);
-      say(items.length > 1 ? items.length + '個の候補が見つかりました。' : '候補は1個でした。環境によっては複数表示されないことがあります。');
-    };
-    cur.onerror = function(e){
-      if (cur !== rec) return;
-      finish(true);
-      if (e.error === 'aborted') return;
-      var m = {
-        'not-allowed': 'マイクが許可されていません。ブラウザの設定でマイクを許可してください。',
-        'service-not-allowed': 'マイクが許可されていません。ブラウザの設定でマイクを許可してください。',
-        'no-speech': '声が聞こえませんでした。もう一度話してください。',
-        'audio-capture': 'マイクが見つかりません。',
-        'network': 'ネットワークに接続してから、もう一度お試しください。'
-      };
-      say(m[e.error] || '音声認識でエラーが起きました（' + e.error + '）。', true);
-    };
-    cur.onend = function(){
-      if (cur !== rec) return;
-      finish(false);
-      if (!got) say('聞き取れませんでした。もう一度話してください。', true);
-    };
-    try {
-      cur.start();
-      timer = setTimeout(function(){
-        if (cur === rec) { finish(true); say('時間切れです。もう一度押して話してください。', true); }
-      }, 10000);
-    } catch(err){ finish(true); say('開始できませんでした。もう一度押してください。', true); }
+    sess++; done = false; tries = 0; lastRes = null;
+    say('準備しています…');
+    startRec(sess);
   };
 })();
 </script>
