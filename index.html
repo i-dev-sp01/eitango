@@ -1,333 +1,302 @@
 <!DOCTYPE html>
-<!-- バージョン 1.8（聞き取りごとに自動リセット） 作成日時 2026-10-28 16:38 JST -->
 <html lang="ja">
 <head>
-<meta charset="utf-8">
-<meta name="version" content="1.8 / 2026-10-28 16:38 JST">
+<meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>英単語 聞き取り候補</title>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,600&family=Zen+Kaku+Gothic+New:wght@400;700&display=swap">
+<title>音声 単語候補</title>
 <style>
-:root{
-  --bg:#eef2f7;--card:#ffffff;--ink:#14213d;--sub:#5b6785;--line:#d5dcea;
-  --accent:#2f5bff;--onaccent:#ffffff;--hit:#ffd23f;--onhit:#14213d;--err:#c0392b;
-  box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px);
-}
-@media (prefers-color-scheme:dark){
-  :root:not([data-theme="light"]){--bg:#0f1830;--card:#18244a;--ink:#eaf0ff;--sub:#9fb0d6;--line:#2c3b6b;--accent:#7a9bff;--onaccent:#0f1830;--hit:#ffd23f;--onhit:#14213d;--err:#ff8b7d;color-scheme:dark}
-}
-:root[data-theme="dark"]{--bg:#0f1830;--card:#18244a;--ink:#eaf0ff;--sub:#9fb0d6;--line:#2c3b6b;--accent:#7a9bff;--onaccent:#0f1830;--hit:#ffd23f;--onhit:#14213d;--err:#ff8b7d;color-scheme:dark}
-html{scroll-padding-top:env(safe-area-inset-top,0px)}
-*{box-sizing:border-box}
-body{margin:0;background:var(--bg);color:var(--ink);font-family:"Zen Kaku Gothic New","Hiragino Sans","Noto Sans JP",sans-serif;line-height:1.7}
-main{max-width:30rem;margin:0 auto;padding:1.5rem 1.1rem 3rem}
-h1{font-size:1.35rem;margin:.2rem 0 .3rem}
-.lead{color:var(--sub);margin:0 0 1.2rem;font-size:.95rem}
-.seg{display:inline-flex;border:1px solid var(--line);border-radius:999px;overflow:hidden;margin-bottom:1.4rem}
-.seg button{font:inherit;font-size:.9rem;border:0;background:transparent;color:var(--sub);padding:.35rem 1rem;cursor:pointer}
-.seg button[aria-pressed="true"]{background:var(--ink);color:var(--bg);font-weight:700}
-.stage{display:flex;flex-direction:column;align-items:center;gap:.8rem;margin:.5rem 0 1.6rem}
-#mic{width:7.5rem;height:7.5rem;border-radius:50%;border:0;background:var(--accent);color:var(--onaccent);font:inherit;font-weight:700;font-size:1rem;cursor:pointer;display:grid;place-items:center;transition:transform .15s}
-#mic:active{transform:scale(.95)}
-#mic.on{background:var(--err);animation:pulse 1.2s ease-in-out infinite}
-@keyframes pulse{50%{box-shadow:0 0 0 1.1rem color-mix(in srgb,var(--err) 20%,transparent)}}
-#mic svg{width:2.4rem;height:2.4rem;display:block;margin:0 auto .15rem}
-button:focus-visible{outline:3px solid var(--hit);outline-offset:3px}
-#status{min-height:1.6em;color:var(--sub);font-size:.95rem;text-align:center;margin:0}
-#status.err{color:var(--err)}
-h2{font-size:1rem;margin:0 0 .6rem}
-ul{list-style:none;margin:0;padding:0;display:grid;gap:.5rem}
-.cand{width:100%;display:grid;grid-template-columns:1fr auto;align-items:center;gap:.2rem .8rem;text-align:left;font:inherit;color:inherit;background:var(--card);border:1px solid var(--line);border-radius:.9rem;padding:.7rem 1rem;cursor:pointer;position:relative;overflow:hidden}
-.cand .w{font-family:Fraunces,Georgia,serif;font-weight:600;font-size:1.5rem;line-height:1.3}
-.cand .p{font-size:.85rem;color:var(--sub);font-variant-numeric:tabular-nums}
-.cand .ja{grid-column:1/-1;font-size:1rem;font-weight:700;line-height:1.4}
-.cand .ja.mute{color:var(--sub);font-weight:400;font-size:.88rem}
-.cand .bar{grid-column:1/-1;height:.28rem;border-radius:99px;background:var(--line);overflow:hidden}
-.cand .bar i{display:block;height:100%;background:var(--accent)}
-.cand.top{border-color:var(--hit);box-shadow:inset .3rem 0 0 var(--hit)}
-.cand.top .tag{background:var(--hit);color:var(--onhit);font-size:.75rem;font-weight:700;border-radius:99px;padding:0 .55rem;margin-left:.5rem;vertical-align:.25em}
-.hint{color:var(--sub);font-size:.85rem;margin:.7rem 0 0}
-#hist{margin-top:2rem}
-#hist li{display:flex;flex-wrap:wrap;gap:.3rem .6rem;color:var(--sub);font-size:.9rem;border-bottom:1px solid var(--line);padding:.35rem 0}
-#hist b{color:var(--ink);font-family:Fraunces,Georgia,serif}
-.ver{margin-top:2.2rem;text-align:center;color:var(--sub);font-size:.78rem}
-.empty{color:var(--sub);text-align:center;padding:1rem 0}
-@media (prefers-reduced-motion:reduce){#mic.on{animation:none}}
+  :root{
+    --bg:#f4f6fa; --card:#fff; --text:#1c2230; --sub:#667085; --accent:#2f6fed;
+    --rec:#e5383b; --line:#e3e7ee;
+  }
+  @media (prefers-color-scheme: dark){
+    :root{ --bg:#10131a; --card:#1a1f2b; --text:#edf0f6; --sub:#9aa4b8; --accent:#6c9bff; --rec:#ff6b6e; --line:#2b3243; }
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;background:var(--bg);color:var(--text);
+    font-family:-apple-system,BlinkMacSystemFont,"Hiragino Sans","Noto Sans JP",sans-serif;
+    -webkit-text-size-adjust:100%}
+  body{padding:env(safe-area-inset-top) 16px calc(env(safe-area-inset-bottom) + 24px)}
+  .wrap{max-width:720px;margin:0 auto}
+  header{display:flex;justify-content:space-between;align-items:flex-start;gap:8px;padding:14px 0 6px}
+  h1{font-size:20px;margin:0}
+  .meta{text-align:right;font-size:12px;color:var(--sub);line-height:1.5}
+  .meta b{color:var(--text);font-weight:600}
+  .mic-area{display:flex;flex-direction:column;align-items:center;gap:10px;margin:18px 0 12px}
+  #micBtn{
+    width:104px;height:104px;border-radius:50%;border:none;background:var(--accent);color:#fff;
+    font-size:44px;display:flex;align-items:center;justify-content:center;
+    box-shadow:0 6px 18px rgba(47,111,237,.35);touch-action:manipulation;
+    -webkit-tap-highlight-color:transparent;cursor:pointer;transition:transform .1s
+  }
+  #micBtn:active{transform:scale(.96)}
+  #micBtn.rec{background:var(--rec);box-shadow:0 0 0 0 rgba(229,56,59,.5);animation:pulse 1.4s infinite}
+  @keyframes pulse{70%{box-shadow:0 0 0 22px rgba(229,56,59,0)}100%{box-shadow:0 0 0 0 rgba(229,56,59,0)}}
+  #status{font-size:14px;color:var(--sub);min-height:20px;text-align:center}
+  #heard{font-size:18px;font-weight:600;min-height:26px;text-align:center}
+  .manual{display:flex;gap:8px;margin:8px 0 4px}
+  .manual input{flex:1;font-size:16px;padding:10px 12px;border-radius:10px;border:1px solid var(--line);background:var(--card);color:var(--text)}
+  .manual button{font-size:15px;padding:10px 16px;border:none;border-radius:10px;background:var(--accent);color:#fff}
+  #warn{display:none;background:#fff3cd;color:#664d03;border-radius:10px;padding:10px 12px;font-size:13px;margin:8px 0;line-height:1.5}
+  h2{font-size:15px;color:var(--sub);margin:20px 0 8px;font-weight:600}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:12px 14px;margin-bottom:10px}
+  .card .top{display:flex;align-items:baseline;gap:8px}
+  .card .word{font-size:22px;font-weight:700}
+  .card .rank{font-size:11px;color:var(--sub)}
+  .card .conf{margin-left:auto;font-size:12px;color:var(--accent)}
+  .sec{font-size:11px;color:var(--sub);margin-top:8px;font-weight:600}
+  .body{font-size:14px;line-height:1.6;margin-top:2px;white-space:pre-wrap}
+  .body.dim{color:var(--sub)}
+  .empty{color:var(--sub);font-size:14px;text-align:center;padding:24px 0}
+  footer{margin-top:24px;text-align:center;font-size:11px;color:var(--sub)}
 </style>
 </head>
 <body>
-<main>
-  <h1>英単語 聞き取り候補</h1>
-  <p class="lead">マイクを押して英単語を1つ話すと、聞き取った候補を一覧で表示します。</p>
+<div class="wrap">
+  <header>
+    <h1>🎙 音声 単語候補</h1>
+    <div class="meta">
+      <div>Version <b id="ver"></b></div>
+      <div id="clock"></div>
+    </div>
+  </header>
 
-  <div class="seg" role="group" aria-label="発音の種類">
-    <button type="button" id="us" aria-pressed="true">アメリカ英語</button>
-    <button type="button" id="uk" aria-pressed="false">イギリス英語</button>
+  <div id="warn"></div>
+
+  <div class="mic-area">
+    <button id="micBtn" aria-label="音声入力の開始/停止">🎤</button>
+    <div id="status">マイクをタップして話し始めてください</div>
+    <div id="heard"></div>
   </div>
 
-  <div class="stage">
-    <button id="mic" type="button" aria-label="話す">
-      <span>
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="3" width="6" height="12" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3"/></svg>
-        話す
-      </span>
-    </button>
-    <p id="status" role="status">マイクを押して、英単語を1つ話してください。</p>
-  </div>
+  <form class="manual" id="manualForm">
+    <input id="manualInput" type="text" placeholder="手入力 / キーボードの音声入力でも検索" autocomplete="off">
+    <button type="submit">検索</button>
+  </form>
 
-  <section aria-live="polite">
-    <h2>聞き取り候補</h2>
-    <ul id="list"><li class="empty">まだ結果がありません。</li></ul>
-    <p class="hint" id="hint" hidden>候補をタップすると、その単語の発音を聞けます。</p>
-  </section>
+  <h2>候補一覧</h2>
+  <div id="list"><div class="empty">まだ候補はありません</div></div>
 
-  <section id="hist" hidden>
-    <h2>これまでの結果</h2>
-    <ul id="histList"></ul>
-  </section>
-  <p class="ver">バージョン 1.8（2026年10月28日 16:38 作成）</p>
-</main>
+  <footer>意味: Wiktionary / 概念: Wikipedia（日本語版）より取得</footer>
+</div>
 
 <script>
 (function(){
+  "use strict";
+  var VERSION = "1.0.0";
+  var BUILD   = "2026-10-28";
+  document.getElementById("ver").textContent = VERSION + " (" + BUILD + ")";
+
+  // ---- 日時（年月日 時:分） ----
+  var clockEl = document.getElementById("clock");
+  function pad(n){ return (n<10?"0":"")+n; }
+  function tick(){
+    var d = new Date();
+    clockEl.textContent = d.getFullYear()+"年"+pad(d.getMonth()+1)+"月"+pad(d.getDate())+"日 "+pad(d.getHours())+":"+pad(d.getMinutes());
+  }
+  tick(); setInterval(tick, 5000);
+
+  // ---- 要素 ----
+  var micBtn = document.getElementById("micBtn");
+  var statusEl = document.getElementById("status");
+  var heardEl = document.getElementById("heard");
+  var listEl = document.getElementById("list");
+  var warnEl = document.getElementById("warn");
+
+  function setStatus(t){ statusEl.textContent = t; }
+
+  // ---- 音声認識 ----
   var SR = window.SpeechRecognition || window.webkitSpeechRecognition;
-  var mic = document.getElementById('mic');
-  var statusEl = document.getElementById('status');
-  var list = document.getElementById('list');
-  var hint = document.getElementById('hint');
-  var hist = document.getElementById('hist');
-  var histList = document.getElementById('histList');
-  var lang = 'en-US';
-  var listening = false;
-  var cache = {}, curItems = null, histData = [];
+  var recog = null;
+  var wantListening = false;   // ユーザーが「開始」状態にしているか
+  var starting = false;
 
-  function say(msg, isErr){ statusEl.textContent = msg; statusEl.className = isErr ? 'err' : ''; }
-
-  function setLang(l){
-    lang = l;
-    document.getElementById('us').setAttribute('aria-pressed', l === 'en-US');
-    document.getElementById('uk').setAttribute('aria-pressed', l === 'en-GB');
-  }
-  document.getElementById('us').onclick = function(){ setLang('en-US'); };
-  document.getElementById('uk').onclick = function(){ setLang('en-GB'); };
-
-  function speak(t){
-    try {
-      speechSynthesis.cancel();
-      var u = new SpeechSynthesisUtterance(t);
-      u.lang = lang; u.rate = .85;
-      speechSynthesis.speak(u);
-    } catch(e){}
+  if(!SR){
+    warnEl.style.display = "block";
+    warnEl.textContent = "このブラウザでは音声認識(Web Speech API)が使えません。iOS の Chrome では非対応の場合があります。Safari で開くか、下の入力欄でキーボードの音声入力（🎤）をお使いください。";
+    setStatus("音声認識は利用できません");
   }
 
-  // 1回の聞き取りごとにページを読み込み直し、毎回まっさらな状態にする
-  function saveAndReload(msg, isErr){
-    try {
-      sessionStorage.setItem('st', JSON.stringify({ lang: lang, cache: cache, items: curItems, hist: histData, msg: msg, err: !!isErr }));
-    } catch(e){}
-    location.reload();
-  }
+  function createRecog(){
+    var r = new SR();
+    r.lang = "ja-JP";
+    r.continuous = true;
+    r.interimResults = true;
+    r.maxAlternatives = 10;
 
-  var JA = /[\u3040-\u30ff\u3400-\u9fff]/;
-  function translate(text, el){
-    var key = text.toLowerCase();
-    function put(ja){
-      if (ja) { el.textContent = ja; el.className = 'ja'; }
-      else { el.textContent = '訳を取得できませんでした'; el.className = 'ja mute'; }
-    }
-    if (key in cache) { put(cache[key]); return Promise.resolve(); }
-    return fetch('https://api.mymemory.translated.net/get?langpair=en|ja&q=' + encodeURIComponent(key))
-      .then(function(r){ return r.json(); })
-      .then(function(d){
-        var ja = d && d.responseData && d.responseData.translatedText;
-        if (!ja || !JA.test(ja)) ja = '';
-        cache[key] = ja; put(ja);
-      })
-      .catch(function(){ put(''); });
-  }
-
-  function renderList(items){
-    var ps = [];
-    list.innerHTML = '';
-    items.forEach(function(it, i){
-      var li = document.createElement('li');
-      var b = document.createElement('button');
-      b.type = 'button';
-      b.className = 'cand' + (i === 0 ? ' top' : '');
-      var pct = Math.round(it.c * 100);
-      b.innerHTML = '<span class="w"></span><span class="p"></span><span class="ja mute">訳を調べています…</span><span class="bar"><i></i></span>';
-      ps.push(translate(it.t, b.querySelector('.ja')));
-      b.querySelector('.w').textContent = it.t;
-      if (i === 0) { var tag = document.createElement('span'); tag.className = 'tag'; tag.textContent = '最有力'; b.querySelector('.w').appendChild(tag); }
-      b.querySelector('.p').textContent = pct + '%';
-      b.querySelector('i').style.width = Math.max(pct, 2) + '%';
-      b.setAttribute('aria-label', it.t + '、' + pct + 'パーセント。タップで発音を聞く');
-      b.onclick = function(){ speak(it.t); };
-      li.appendChild(b);
-      list.appendChild(li);
-    });
-    hint.hidden = false;
-    return ps;
-  }
-
-  function renderHist(){
-    histList.innerHTML = '';
-    histData.forEach(function(h){
-      var li = document.createElement('li');
-      li.innerHTML = '<b></b><span></span>';
-      li.querySelector('b').textContent = h.t;
-      li.querySelector('span').textContent = h.rest;
-      histList.appendChild(li);
-    });
-    hist.hidden = !histData.length;
-  }
-
-  function show(items){
-    curItems = items;
-    histData.unshift({ t: items[0].t, rest: items.slice(1).map(function(x){ return x.t; }).join('、') });
-    histData = histData.slice(0, 8);
-    renderHist();
-    return renderList(items);
-  }
-
-  // 読み込み直したあとに、前回の結果とメッセージを復元する
-  try {
-    var st = JSON.parse(sessionStorage.getItem('st') || 'null');
-    sessionStorage.removeItem('st');
-    if (st) {
-      if (st.lang === 'en-US' || st.lang === 'en-GB') setLang(st.lang);
-      cache = st.cache || {};
-      histData = st.hist || [];
-      curItems = st.items || null;
-      renderHist();
-      if (curItems) renderList(curItems);
-      if (st.msg) say(st.msg, st.err);
-    }
-  } catch(e){}
-
-  if (!SR) {
-    mic.disabled = true;
-    say('このブラウザは音声認識に対応していません。iPhoneはSafari、AndroidやパソコンはChromeで開いてください。', true);
-    return;
-  }
-
-  var timer = null, overall = null, rec = null, sess = 0, done = true, tries = 0, lastRes = null;
-
-  function ui(on){
-    listening = on;
-    mic.classList.toggle('on', on);
-    mic.setAttribute('aria-label', on ? '中止' : '話す');
-  }
-
-  function deliver(res){
-    var items = [], seen = {};
-    if (res) {
-      for (var i = 0; i < res.length; i++) {
-        var t = res[i].transcript.trim();
-        var k = t.toLowerCase();
-        if (t && !seen[k]) { seen[k] = 1; items.push({ t: t, c: res[i].confidence || 0 }); }
+    r.onstart = function(){
+      starting = false;
+      micBtn.classList.add("rec");
+      setStatus("聞いています… もう一度タップで停止");
+    };
+    r.onresult = function(e){
+      for(var i=e.resultIndex; i<e.results.length; i++){
+        var res = e.results[i];
+        if(res.isFinal){
+          var alts = [];
+          for(var j=0;j<res.length;j++){
+            alts.push({text:res[j].transcript.trim(), conf:res[j].confidence});
+          }
+          heardEl.textContent = alts[0] ? alts[0].text : "";
+          showCandidates(alts);
+        }else{
+          heardEl.textContent = res[0].transcript;
+        }
       }
-    }
-    if (!items.length) { saveAndReload('聞き取れませんでした。もう一度「話す」を押して話してください。', true); return; }
-    var msg = items.length > 1 ? items.length + '個の候補が見つかりました。' : '候補は1個でした。環境によっては複数表示されないことがあります。';
-    mic.disabled = true;
-    say('結果を整えています…');
-    var ps = show(items), went = false;
-    function go(){ if (went) return; went = true; saveAndReload(msg, false); }
-    Promise.all(ps).then(go);
-    setTimeout(go, 4000);
-  }
-
-  function release(){
-    clearTimeout(timer); clearTimeout(overall);
-    var r = rec; rec = null;
-    if (r) {
-      r.onstart = r.onaudiostart = r.onresult = r.onerror = r.onend = r.onspeechend = null;
-      try { r.abort(); } catch(e){}
-    }
-  }
-  function finalize(id){
-    if (id !== sess || done) return;
-    done = true; release(); ui(false);
-    deliver(lastRes);
-  }
-  function fail(id, msg){
-    if (id !== sess || done) return;
-    done = true; release(); ui(false);
-    saveAndReload(msg, true);
-  }
-
-  function retryOrFail(id, msg){
-    if (id !== sess || done) return;
-    if (tries < 1) { tries++; say('接続し直しています…'); startRec(id); }
-    else fail(id, msg || '聞き取れませんでした。もう一度「話す」を押してください。');
-  }
-
-  function startRec(id){
-    release(); ui(false);
-    setTimeout(function(){
-      if (id !== sess || done) return;
-      var r = new SR();
-      rec = r;
-      var opened = false;
-      r.lang = lang;
-      r.maxAlternatives = 10;
-      r.interimResults = false;
-      r.continuous = false;
-      function opening(){
-        if (id !== sess || done || opened) return;
-        opened = true; clearTimeout(timer);
-        ui(true); say('聞いています…');
-        overall = setTimeout(function(){
-          if (id !== sess || done) return;
-          try { r.stop(); } catch(e){}
-          setTimeout(function(){ if (lastRes) finalize(id); else fail(id, '時間切れです。もう一度「話す」を押して話してください。'); }, 1500);
-        }, 12000);
+    };
+    r.onerror = function(e){
+      starting = false;
+      if(e.error === "not-allowed" || e.error === "service-not-allowed"){
+        wantListening = false;
+        setStatus("マイクの使用が許可されていません（設定で許可してください）");
+      }else if(e.error === "no-speech"){
+        setStatus("音声が検出されませんでした。話してください…");
+      }else if(e.error === "aborted"){
+        // 手動停止
+      }else{
+        setStatus("エラー: " + e.error);
       }
-      r.onstart = opening;
-      r.onaudiostart = opening;
-      r.onspeechend = function(){ if (id === sess && !done) { try { r.stop(); } catch(e){} } };
-      r.onresult = function(e){
-        if (id !== sess || done) return;
-        lastRes = e.results[e.results.length - 1];
-        finalize(id);
-      };
-      r.onerror = function(e){
-        if (id !== sess || done) return;
-        if (e.error === 'no-speech') { fail(id, '声が聞こえませんでした。もう一度話してください。（no-speech）'); return; }
-        if (e.error === 'aborted') { retryOrFail(id); return; }
-        var m = {
-          'not-allowed': 'マイクが許可されていません。ブラウザの設定でマイクを許可してください。',
-          'service-not-allowed': '音声認識が許可されていません。端末の設定で Siri と音声入力を確認してください。',
-          'audio-capture': 'マイクが見つかりません。',
-          'network': 'ネットワークに接続してから、もう一度お試しください。'
-        };
-        fail(id, (m[e.error] || '音声認識でエラーが起きました。') + '（' + e.error + '）');
-      };
-      r.onend = function(){
-        if (id !== sess || done) return;
-        if (lastRes) finalize(id);
-        else if (!opened) retryOrFail(id);
-        else fail(id, '聞き取れませんでした。もう一度「話す」を押して話してください。');
-      };
-      try {
-        r.start();
-        timer = setTimeout(function(){ retryOrFail(id); }, 4000);
-      } catch(err){ retryOrFail(id, '開始できませんでした。もう一度押してください。'); }
-    }, 200);
+    };
+    r.onend = function(){
+      starting = false;
+      // 自動終了した場合、ユーザーが停止していなければ再開
+      if(wantListening){
+        setTimeout(function(){ if(wantListening) safeStart(); }, 250);
+      }else{
+        micBtn.classList.remove("rec");
+        micBtn.textContent = "🎤";
+        if(!/エラー|許可/.test(statusEl.textContent)) setStatus("停止しました。タップで再開");
+      }
+    };
+    return r;
   }
 
-  mic.onclick = function(){
-    if (!done) {
-      done = true; release(); ui(false);
-      saveAndReload('中止しました。もう一度「話す」を押すと再開できます。', false);
+  function safeStart(){
+    if(starting) return;
+    starting = true;
+    try{
+      recog = createRecog();   // 毎回新規作成（iOSでの安定性のため）
+      recog.start();
+    }catch(err){
+      starting = false;
+      setStatus("開始できませんでした: " + err.message);
+    }
+  }
+
+  function startListening(){
+    wantListening = true;
+    heardEl.textContent = "";
+    listEl.innerHTML = '<div class="empty">話してください…</div>';
+    micBtn.textContent = "⏹";
+    setStatus("準備中…");
+    safeStart();
+  }
+  function stopListening(){
+    wantListening = false;
+    micBtn.classList.remove("rec");
+    micBtn.textContent = "🎤";
+    setStatus("停止しました。タップで再開");
+    try{ if(recog) recog.stop(); }catch(e){}
+  }
+
+  micBtn.addEventListener("click", function(){
+    if(!SR){ return; }
+    if(wantListening){ stopListening(); } else { startListening(); }
+  });
+
+  // ---- 手入力 ----
+  document.getElementById("manualForm").addEventListener("submit", function(ev){
+    ev.preventDefault();
+    var inp = document.getElementById("manualInput");
+    var v = inp.value.trim();
+    if(!v) return;
+    heardEl.textContent = v;
+    showCandidates([{text:v, conf:1}]);
+    inp.blur();
+  });
+
+  // ---- 候補表示 ----
+  function showCandidates(alts){
+    var seen = {}, uniq = [];
+    alts.forEach(function(a){
+      if(a.text && !seen[a.text]){ seen[a.text]=1; uniq.push(a); }
+    });
+    listEl.innerHTML = "";
+    if(!uniq.length){
+      listEl.innerHTML = '<div class="empty">候補が見つかりませんでした</div>';
       return;
     }
-    try { speechSynthesis.cancel(); } catch(e){}
-    sess++; done = false; tries = 0; lastRes = null;
-    say('準備しています…');
-    startRec(sess);
-  };
+    uniq.forEach(function(a, idx){
+      var card = document.createElement("div"); card.className = "card";
+
+      var top = document.createElement("div"); top.className = "top";
+      var w = document.createElement("span"); w.className = "word"; w.textContent = a.text;
+      var rk = document.createElement("span"); rk.className = "rank"; rk.textContent = "候補 " + (idx+1);
+      top.appendChild(w); top.appendChild(rk);
+      if(typeof a.conf === "number" && a.conf > 0){
+        var cf = document.createElement("span"); cf.className = "conf";
+        cf.textContent = "確度 " + Math.round(a.conf*100) + "%";
+        top.appendChild(cf);
+      }
+      card.appendChild(top);
+
+      var s1 = document.createElement("div"); s1.className = "sec"; s1.textContent = "意味（主な語義）";
+      var b1 = document.createElement("div"); b1.className = "body dim"; b1.textContent = "読み込み中…";
+      var s2 = document.createElement("div"); s2.className = "sec"; s2.textContent = "概念・解説";
+      var b2 = document.createElement("div"); b2.className = "body dim"; b2.textContent = "読み込み中…";
+      card.appendChild(s1); card.appendChild(b1); card.appendChild(s2); card.appendChild(b2);
+      listEl.appendChild(card);
+
+      lookup("ja.wiktionary.org", a.text, 220).then(function(t){ fill(b1, t); });
+      lookup("ja.wikipedia.org", a.text, 260).then(function(t){ fill(b2, t); });
+    });
+  }
+
+  function fill(el, text){
+    if(text){ el.className = "body"; el.textContent = text; }
+    else { el.className = "body dim"; el.textContent = "情報が見つかりませんでした"; }
+  }
+
+  // ---- 辞書/百科検索 (MediaWiki API, CORS対応) ----
+  var cache = {};
+  function api(host, params){
+    var q = Object.keys(params).map(function(k){
+      return encodeURIComponent(k)+"="+encodeURIComponent(params[k]);
+    }).join("&");
+    return fetch("https://"+host+"/w/api.php?"+q+"&format=json&origin=*")
+      .then(function(r){ return r.json(); });
+  }
+  function firstPage(data){
+    if(!data || !data.query || !data.query.pages) return null;
+    var ids = Object.keys(data.query.pages);
+    var best = null;
+    ids.forEach(function(id){
+      var p = data.query.pages[id];
+      if(p && !p.missing && p.extract && (!best || (p.index||0) < (best.index||0))) best = p;
+    });
+    return best;
+  }
+  function clean(t, max){
+    t = (t||"").replace(/\s+\n/g,"\n").replace(/\n{2,}/g,"\n").trim();
+    if(t.length > max) t = t.slice(0, max) + "…";
+    return t;
+  }
+  function lookup(host, word, max){
+    var key = host+"|"+word;
+    if(cache[key]) return cache[key];
+    var base = {action:"query", prop:"extracts", exintro:1, explaintext:1, redirects:1};
+    var p = api(host, Object.assign({titles:word}, base)).then(function(d){
+      var pg = firstPage(d);
+      if(pg) return clean(pg.extract, max);
+      // 完全一致がなければ検索の先頭を使う
+      return api(host, Object.assign({generator:"search", gsrsearch:word, gsrlimit:1}, base)).then(function(d2){
+        var pg2 = firstPage(d2);
+        return pg2 ? clean("【" + pg2.title + "】\n" + pg2.extract, max) : "";
+      });
+    }).catch(function(){ return ""; });
+    cache[key] = p;
+    return p;
+  }
 })();
 </script>
 </body>
