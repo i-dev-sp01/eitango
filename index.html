@@ -1,0 +1,188 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>英単語 聞き取り候補</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,600&family=Zen+Kaku+Gothic+New:wght@400;700&display=swap">
+<style>
+:root{
+  --bg:#eef2f7;--card:#ffffff;--ink:#14213d;--sub:#5b6785;--line:#d5dcea;
+  --accent:#2f5bff;--onaccent:#ffffff;--hit:#ffd23f;--onhit:#14213d;--err:#c0392b;
+  box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px);
+}
+@media (prefers-color-scheme:dark){
+  :root:not([data-theme="light"]){--bg:#0f1830;--card:#18244a;--ink:#eaf0ff;--sub:#9fb0d6;--line:#2c3b6b;--accent:#7a9bff;--onaccent:#0f1830;--hit:#ffd23f;--onhit:#14213d;--err:#ff8b7d;color-scheme:dark}
+}
+:root[data-theme="dark"]{--bg:#0f1830;--card:#18244a;--ink:#eaf0ff;--sub:#9fb0d6;--line:#2c3b6b;--accent:#7a9bff;--onaccent:#0f1830;--hit:#ffd23f;--onhit:#14213d;--err:#ff8b7d;color-scheme:dark}
+html{scroll-padding-top:env(safe-area-inset-top,0px)}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:"Zen Kaku Gothic New","Hiragino Sans","Noto Sans JP",sans-serif;line-height:1.7}
+main{max-width:30rem;margin:0 auto;padding:1.5rem 1.1rem 3rem}
+h1{font-size:1.35rem;margin:.2rem 0 .3rem}
+.lead{color:var(--sub);margin:0 0 1.2rem;font-size:.95rem}
+.seg{display:inline-flex;border:1px solid var(--line);border-radius:999px;overflow:hidden;margin-bottom:1.4rem}
+.seg button{font:inherit;font-size:.9rem;border:0;background:transparent;color:var(--sub);padding:.35rem 1rem;cursor:pointer}
+.seg button[aria-pressed="true"]{background:var(--ink);color:var(--bg);font-weight:700}
+.stage{display:flex;flex-direction:column;align-items:center;gap:.8rem;margin:.5rem 0 1.6rem}
+#mic{width:7.5rem;height:7.5rem;border-radius:50%;border:0;background:var(--accent);color:var(--onaccent);font:inherit;font-weight:700;font-size:1rem;cursor:pointer;display:grid;place-items:center;transition:transform .15s}
+#mic:active{transform:scale(.95)}
+#mic.on{background:var(--err);animation:pulse 1.2s ease-in-out infinite}
+@keyframes pulse{50%{box-shadow:0 0 0 1.1rem color-mix(in srgb,var(--err) 20%,transparent)}}
+#mic svg{width:2.4rem;height:2.4rem;display:block;margin:0 auto .15rem}
+button:focus-visible{outline:3px solid var(--hit);outline-offset:3px}
+#status{min-height:1.6em;color:var(--sub);font-size:.95rem;text-align:center;margin:0}
+#status.err{color:var(--err)}
+h2{font-size:1rem;margin:0 0 .6rem}
+ul{list-style:none;margin:0;padding:0;display:grid;gap:.5rem}
+.cand{width:100%;display:grid;grid-template-columns:1fr auto;align-items:center;gap:.2rem .8rem;text-align:left;font:inherit;color:inherit;background:var(--card);border:1px solid var(--line);border-radius:.9rem;padding:.7rem 1rem;cursor:pointer;position:relative;overflow:hidden}
+.cand .w{font-family:Fraunces,Georgia,serif;font-weight:600;font-size:1.5rem;line-height:1.3}
+.cand .p{font-size:.85rem;color:var(--sub);font-variant-numeric:tabular-nums}
+.cand .bar{grid-column:1/-1;height:.28rem;border-radius:99px;background:var(--line);overflow:hidden}
+.cand .bar i{display:block;height:100%;background:var(--accent)}
+.cand.top{border-color:var(--hit);box-shadow:inset .3rem 0 0 var(--hit)}
+.cand.top .tag{background:var(--hit);color:var(--onhit);font-size:.75rem;font-weight:700;border-radius:99px;padding:0 .55rem;margin-left:.5rem;vertical-align:.25em}
+.hint{color:var(--sub);font-size:.85rem;margin:.7rem 0 0}
+#hist{margin-top:2rem}
+#hist li{display:flex;flex-wrap:wrap;gap:.3rem .6rem;color:var(--sub);font-size:.9rem;border-bottom:1px solid var(--line);padding:.35rem 0}
+#hist b{color:var(--ink);font-family:Fraunces,Georgia,serif}
+.empty{color:var(--sub);text-align:center;padding:1rem 0}
+@media (prefers-reduced-motion:reduce){#mic.on{animation:none}}
+</style>
+</head>
+<body>
+<main>
+  <h1>英単語 聞き取り候補</h1>
+  <p class="lead">マイクを押して英単語を1つ話すと、聞き取った候補を一覧で表示します。</p>
+
+  <div class="seg" role="group" aria-label="発音の種類">
+    <button type="button" id="us" aria-pressed="true">アメリカ英語</button>
+    <button type="button" id="uk" aria-pressed="false">イギリス英語</button>
+  </div>
+
+  <div class="stage">
+    <button id="mic" type="button" aria-label="話す">
+      <span>
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="3" width="6" height="12" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3"/></svg>
+        話す
+      </span>
+    </button>
+    <p id="status" role="status">マイクを押して、英単語を1つ話してください。</p>
+  </div>
+
+  <section aria-live="polite">
+    <h2>聞き取り候補</h2>
+    <ul id="list"><li class="empty">まだ結果がありません。</li></ul>
+    <p class="hint" id="hint" hidden>候補をタップすると、その単語の発音を聞けます。</p>
+  </section>
+
+  <section id="hist" hidden>
+    <h2>これまでの結果</h2>
+    <ul id="histList"></ul>
+  </section>
+</main>
+
+<script>
+(function(){
+  var SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+  var mic = document.getElementById('mic');
+  var statusEl = document.getElementById('status');
+  var list = document.getElementById('list');
+  var hint = document.getElementById('hint');
+  var hist = document.getElementById('hist');
+  var histList = document.getElementById('histList');
+  var lang = 'en-US';
+  var listening = false;
+  var rec = null;
+
+  function say(msg, isErr){ statusEl.textContent = msg; statusEl.className = isErr ? 'err' : ''; }
+
+  function setLang(l){
+    lang = l;
+    document.getElementById('us').setAttribute('aria-pressed', l === 'en-US');
+    document.getElementById('uk').setAttribute('aria-pressed', l === 'en-GB');
+  }
+  document.getElementById('us').onclick = function(){ setLang('en-US'); };
+  document.getElementById('uk').onclick = function(){ setLang('en-GB'); };
+
+  function speak(t){
+    try {
+      speechSynthesis.cancel();
+      var u = new SpeechSynthesisUtterance(t);
+      u.lang = lang; u.rate = .85;
+      speechSynthesis.speak(u);
+    } catch(e){}
+  }
+
+  function show(items){
+    list.innerHTML = '';
+    items.forEach(function(it, i){
+      var li = document.createElement('li');
+      var b = document.createElement('button');
+      b.type = 'button';
+      b.className = 'cand' + (i === 0 ? ' top' : '');
+      var pct = Math.round(it.c * 100);
+      b.innerHTML = '<span class="w"></span><span class="p"></span><span class="bar"><i></i></span>';
+      b.querySelector('.w').textContent = it.t;
+      if (i === 0) { var tag = document.createElement('span'); tag.className = 'tag'; tag.textContent = '最有力'; b.querySelector('.w').appendChild(tag); }
+      b.querySelector('.p').textContent = pct + '%';
+      b.querySelector('i').style.width = Math.max(pct, 2) + '%';
+      b.setAttribute('aria-label', it.t + '、' + pct + 'パーセント。タップで発音を聞く');
+      b.onclick = function(){ speak(it.t); };
+      li.appendChild(b);
+      list.appendChild(li);
+    });
+    hint.hidden = false;
+    var h = document.createElement('li');
+    h.innerHTML = '<b></b><span></span>';
+    h.querySelector('b').textContent = items[0].t;
+    h.querySelector('span').textContent = items.slice(1).map(function(x){ return x.t; }).join('、');
+    histList.insertBefore(h, histList.firstChild);
+    while (histList.children.length > 8) histList.removeChild(histList.lastChild);
+    hist.hidden = false;
+  }
+
+  function stopUi(){ listening = false; mic.classList.remove('on'); mic.setAttribute('aria-label', '話す'); }
+
+  if (!SR) {
+    mic.disabled = true;
+    say('このブラウザは音声認識に対応していません。iPhoneはSafari、AndroidやパソコンはChromeで開いてください。', true);
+    return;
+  }
+
+  mic.onclick = function(){
+    if (listening) { try { rec.stop(); } catch(e){} return; }
+    rec = new SR();
+    rec.lang = lang;
+    rec.maxAlternatives = 10;
+    rec.interimResults = false;
+    rec.continuous = false;
+    rec.onstart = function(){ listening = true; mic.classList.add('on'); mic.setAttribute('aria-label', '停止'); say('聞いています…'); };
+    rec.onresult = function(e){
+      var r = e.results[0], seen = {}, items = [];
+      for (var i = 0; i < r.length; i++) {
+        var t = r[i].transcript.trim();
+        var k = t.toLowerCase();
+        if (t && !seen[k]) { seen[k] = 1; items.push({ t: t, c: r[i].confidence || 0 }); }
+      }
+      if (!items.length) { say('聞き取れませんでした。もう一度話してください。', true); return; }
+      show(items);
+      say(items.length > 1 ? items.length + '個の候補が見つかりました。' : '候補は1個でした。環境によっては複数表示されないことがあります。');
+    };
+    rec.onerror = function(e){
+      var m = {
+        'not-allowed': 'マイクが許可されていません。ブラウザの設定でマイクを許可するか、このページをSafariやChromeで直接開いてください。',
+        'service-not-allowed': 'マイクが許可されていません。ブラウザの設定でマイクを許可するか、このページをSafariやChromeで直接開いてください。',
+        'no-speech': '声が聞こえませんでした。もう一度話してください。',
+        'audio-capture': 'マイクが見つかりません。',
+        'network': 'ネットワークに接続してから、もう一度お試しください。'
+      };
+      say(m[e.error] || '音声認識でエラーが起きました（' + e.error + '）。', true);
+    };
+    rec.onend = stopUi;
+    try { rec.start(); } catch(err){ say('開始できませんでした。もう一度押してください。', true); stopUi(); }
+  };
+})();
+</script>
+</body>
+</html>
